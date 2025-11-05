@@ -16,6 +16,21 @@ int main(int argc, char* argv[])
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
+		printf("Select Examination Type (0=SINGLE_SHOT, 1=SERIES, 2=SERIES_MOTION, 3=FLUORO, 4=NONE): ");
+                    int examType = 4; // Default on NONE
+                    if (scanf("%d", &examType) == 1) {
+                        // Check for valid input
+                        if (examType >= EXAM_TYPE_SINGLE_SHOT && examType <= EXAM_TYPE_NONE) {
+                            selectExaminationType((EXAMINATION_TYPES)examType);
+                        } else {
+                            printf("Invalid selection. Setting to NONE.\n");
+                            selectExaminationType(EXAM_TYPE_NONE);
+                        }
+                    }
+                    // Empty input buffer
+                    int c;
+                    while ((c = getchar()) != '\n' && c != EOF);
+
 	}
 	else {
 		printf("\n\nConnecting with CentralAcquisition Failed. No problem, you can continue with \n");

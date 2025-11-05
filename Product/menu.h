@@ -10,7 +10,7 @@ typedef enum {
 } MenuOptions;
 
 MenuOptions getMenuChoice(void);
-void displayMenu();
+void displayMenu(void);
 
 
 #endif

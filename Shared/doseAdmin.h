@@ -12,14 +12,14 @@
  * Creates and initializes a hash table. No patient data will be present after creation
  *  
  */
-void CreateHashTable(); 
+void CreateHashTable(void); 
 					   
 
 /***************************************************************************************
  * Removes all patient data from the hash table
  * 
  */
-void RemoveAllDataFromHashTable();
+void RemoveAllDataFromHashTable(void);
 
 
 /***************************************************************************************

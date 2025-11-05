@@ -51,7 +51,7 @@ int setupSerialPort(char* ttyName)
 	}
 }
 
-int closeSerialPort(char* receivedChar)
+int closeSerialPort(void)
 {
 	if (serial_port < 0) {
 		printf("Close failed, because port was not setup succesfully\n");

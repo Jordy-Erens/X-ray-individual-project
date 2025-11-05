@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include "Protocol_PatientAdmin_CentralAcq.h"
 
-bool connectWithCentralAcquisition();
-bool disconnectFromCentralAcquisition();
+bool connectWithCentralAcquisition(void);
+bool disconnectFromCentralAcquisition(void);
 void selectExaminationType(const EXAMINATION_TYPES examination);
 bool getDoseDataFromCentralAcquisition(uint32_t * doseData);
 

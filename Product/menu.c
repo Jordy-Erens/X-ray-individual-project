@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 
-static int getInt();
+static int getInt(void);
 
 static const char* MenuStrings[] = {
     "Add Patient",
@@ -18,7 +18,7 @@ MenuOptions getMenuChoice(void)
    return (MenuOptions) getInt();
 }
 
-void displayMenu()
+void displayMenu(void)
 {
 	size_t NrMenuStrings = sizeof(MenuStrings) / sizeof(MenuStrings[0]);
 	
@@ -29,7 +29,7 @@ void displayMenu()
 
 #define MAX_STRLEN 80
 
-static int getInt()
+static int getInt(void)
 {
     char line[MAX_STRLEN];
     char* result = NULL;

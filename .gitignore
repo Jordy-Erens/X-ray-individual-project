@@ -1,0 +1,11 @@
+# Compiled C output
+build/
+
+# PlatformIO environment files
+.pio/
+
+# VSCode editor files
+.vscode/
+
+# macOS system files
+.DS_Store

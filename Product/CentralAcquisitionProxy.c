@@ -4,8 +4,8 @@
 #include <unistd.h> // sleep
 #include "serialPort.h"
 
-static bool setupSerialConnection();
-static bool connect();
+static bool setupSerialConnection(void);
+static bool connect(void);
 static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]);
 static bool getMsgFromCentralAcquisition(char msg[MAX_MSG_SIZE]);
 
@@ -18,7 +18,7 @@ const char * EXAMINATION_MSG = "EXAM";  // Remark that this msg will have an arg
 const char * DOSE_MSG = "DOSE";			// Will also have an argument
 
 
-bool connectWithCentralAcquisition()
+bool connectWithCentralAcquisition(void)
 {
 	bool trySucceeded = false;
 	if (setupSerialConnection()) {
@@ -27,7 +27,7 @@ bool connectWithCentralAcquisition()
 	return trySucceeded;
 }
 
-bool disconnectFromCentralAcquisition()
+bool disconnectFromCentralAcquisition(void)
 {
 	char receivedMsg[MAX_MSG_SIZE];
 	int tryCount = 0;
@@ -54,8 +54,14 @@ bool disconnectFromCentralAcquisition()
 
 void selectExaminationType(const EXAMINATION_TYPES examination) 
 {
-	(void) examination; // remove this line as soon as you are doing something with the argument
-	return;
+	char msg[MAX_MSG_SIZE];
+    snprintf(msg, MAX_MSG_SIZE, "%s%c%d", 
+             EXAMINATION_MSG,     // "EXAM"
+             MSG_ARGUMENT_SEPARATOR, // ':'
+             examination);          // Number (bv. 0)
+
+    // Send message
+    writeMsgToSerialPort(msg);
 }
 
 bool getDoseDataFromCentralAcquisition(uint32_t * doseData)
@@ -104,33 +110,26 @@ static bool getMsgFromCentralAcquisition(char msg[MAX_MSG_SIZE])
 	}
 }
 
-static bool setupSerialConnection()
+static bool setupSerialConnection(void)
 {
-	int ACMNumber = 0;
-	int tryCount = 0;
-	const int maxTryCount = 50;
-	
+    // Dit is de poortnaam die je Mac gebruikt.
+    // Pas deze naam aan als je Arduino een andere poort krijgt!
+    char ttyName[] = "/dev/cu.usbmodem48CA435D02BC2"; 
+
 	printf("Setting up serial connection...  ");
-	do {	
-		char ttyName[30];
-		sprintf(ttyName, "/dev/ttyACM%d", ACMNumber); 
-		if (setupSerialPort(ttyName) == 0) {	
-			printf("  ...connected with %s\n", ttyName);
-			return true;
-		}
-		else {
-			ACMNumber++;
-			tryCount++;
-		}
-	} while (tryCount < maxTryCount);
-	printf("  ...failed %d times to connect with an TTY\n", maxTryCount);
-	printf("    	Did you connect an Arduino???\n");
-	printf("    	In case of wsl, did you start the executable as admin???\n");
-	printf("    	In case of wsl, did you set the Arduino USB connection as shared (via usbipd in power shell)???\n");
+	
+    if (setupSerialPort(ttyName) == 0) {	
+        printf("  ...connected with %s\n", ttyName);
+        return true;
+    }
+	
+	printf("  ...failed to connect with %s\n", ttyName);
+	printf("    	Did you connect the Arduino???\n");
+    printf("    	Is the port name in CentralAcquisitionProxy.c correct?\n");
 	return false;
 }
 
-static bool connect()
+static bool connect(void)
 {
 	char receivedMsg[MAX_MSG_SIZE];
 	int tryCount = 0;
