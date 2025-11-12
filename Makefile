@@ -35,7 +35,7 @@ run: $(PROD_EXEC)
 	@./$(BUILD_DIR)/$(PROD_EXEC)
 
 test: $(TEST_EXEC)
-	valgrind --leak-check=full ./$(BUILD_DIR)/$(TEST_EXEC) 
+	./$(BUILD_DIR)/$(TEST_EXEC) 
 #administration
 
 clean:

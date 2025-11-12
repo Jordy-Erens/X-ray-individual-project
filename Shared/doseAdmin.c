@@ -1,47 +1,34 @@
 #include "doseAdmin.h"
 #include <string.h>  // For strlen, strcmp, strncpy
 #include <stdbool.h> // For bool type
+#include <stdlib.h>  // For malloc, free
+#include <math.h>    // For GetHashPerformance (sqrt)
 
-// --- Sprint 1 Requirements ---
-#define MAX_DOSES_PER_PATIENT 10
-#define MAX_PATIENTS_PER_ENTRY 100
-// -----------------------------
+#define MAX_DOSES_PER_PATIENT 10 // Sprint 2: Still a fixed array of 10
 
-// --- Struct Definitions ---
-
-// Struct for a single dose measurement
+// Represents a single dose measurement
 typedef struct {
 	uint16_t dose;
 	Date date;
 } DoseData;
 
-// Struct for a single patient
+// Represents a patient (dynamically allocated)
 typedef struct {
-    bool isActive; // Needed because we use a static array
 	char patientName[MAX_PATIENTNAME_SIZE];
     DoseData doses[MAX_DOSES_PER_PATIENT];
-    size_t doseCount; // Tracks how many of the 10 spots are used
+    size_t doseCount; // Tracks used dose spots
 } Patient;
 
-// Struct for a Hash Entry
-typedef struct {
-    Patient patients[MAX_PATIENTS_PER_ENTRY];
-    size_t patientCount; // Tracks how many of the 100 spots are used
-} HashEntry;
 
-
-// --- The actual Hash Table ---
-// This is the "array of size 256"
-static HashEntry hashTable[HASHTABLE_SIZE];
+// --- The Hash Table ---
+// Sprint 2: An array of POINTERS to patients.
+// Max 1 patient per entry (NULL if empty).
+static Patient* hashTable[HASHTABLE_SIZE];
 
 
 /**
- * @brief Calculates the hash index for a patient name.
- * @details Based on the PDF hint: sums the ASCII value of the
- * first 5 chars. Uses 255 for missing chars.
- * Then takes the modulo 256.
- * @param patientName The name of the patient.
- * @return The calculated hash index (0-255).
+ * @brief Calculates the hash index (0-255) for a patient name.
+ * @details Sums first 5 chars (uses 255 for missing chars) and takes modulo 256.
  */
 static uint8_t hashFunction(char patientName[MAX_PATIENTNAME_SIZE]){
 	unsigned long sum = 0;
@@ -54,25 +41,25 @@ static uint8_t hashFunction(char patientName[MAX_PATIENTNAME_SIZE]){
             sum += 255; // Value for missing characters
         }
     }
-	return (uint8_t)(sum % HASHTABLE_SIZE); // HASHTABLE_SIZE is 256
+	return (uint8_t)(sum % HASHTABLE_SIZE);
 }
 
 
 void CreateHashTable(void)
 {
-    // Because we use a static array, "Create" simply means
-    // "clearing" the existing data.
-	RemoveAllDataFromHashTable();
+    // Initialize all pointers in the hash table to NULL.
+	for (int i = 0; i < HASHTABLE_SIZE; i++) {
+        hashTable[i] = NULL;
+    }
 }
  
 void RemoveAllDataFromHashTable(void)
 {
-	// Loop through the entire table and set everything to "inactive"
+	// Loop through the table and free any allocated patient data
     for (int i = 0; i < HASHTABLE_SIZE; i++) {
-        hashTable[i].patientCount = 0;
-        for (int j = 0; j < MAX_PATIENTS_PER_ENTRY; j++) {
-            hashTable[i].patients[j].isActive = false;
-            hashTable[i].patients[j].doseCount = 0;
+        if (hashTable[i] != NULL) {
+            free(hashTable[i]);
+            hashTable[i] = NULL;
         }
     }
 }
@@ -83,32 +70,30 @@ int8_t AddPatient(char patientName[MAX_PATIENTNAME_SIZE])
         return -3; // Name too long
     }
 
-    if (IsPatientPresent(patientName) == 0) {
-        return -1; // Patient already present
-    }
-
     uint8_t hash = hashFunction(patientName);
-    HashEntry* entry = &hashTable[hash];
 
-    if (entry->patientCount >= MAX_PATIENTS_PER_ENTRY) {
-        // "Allocation of memory failed"
-        // For Sprint 1, this means the array of 100 is full.
-        return -2;
-    }
-
-    // Find the first empty (inactive) slot in the array
-    for (int i = 0; i < MAX_PATIENTS_PER_ENTRY; i++) {
-        if (!entry->patients[i].isActive) {
-            entry->patients[i].isActive = true;
-            strncpy(entry->patients[i].patientName, patientName, MAX_PATIENTNAME_SIZE);
-            entry->patients[i].doseCount = 0;
-            entry->patientCount++;
-            return 0; // Success
+    if (hashTable[hash] != NULL) {
+        // Slot is full. Check if it's the *same* patient.
+        if (strcmp(hashTable[hash]->patientName, patientName) == 0) {
+            return -1; // Patient already present
         }
+        // Different patient, hash collision. Slot is full for Sprint 2.
+        return -2; // Allocation failed
     }
 
-    // This shouldn't happen if patientCount is correct, but as a fallback:
-    return -2; // No empty slot found
+    // Allocate memory for the new patient
+    Patient* newPatient = (Patient*)malloc(sizeof(Patient));
+    if (newPatient == NULL) {
+        return -2; // Allocation of memory failed
+    }
+
+    // Initialize the new patient
+    strncpy(newPatient->patientName, patientName, MAX_PATIENTNAME_SIZE);
+    newPatient->doseCount = 0;
+    
+    hashTable[hash] = newPatient;
+    
+    return 0; // Success
 }
  
 int8_t RemovePatient(char patientName[MAX_PATIENTNAME_SIZE])
@@ -118,16 +103,12 @@ int8_t RemovePatient(char patientName[MAX_PATIENTNAME_SIZE])
     }
 
     uint8_t hash = hashFunction(patientName);
-    HashEntry* entry = &hashTable[hash];
+    Patient* patient = hashTable[hash];
 
-    for (int i = 0; i < MAX_PATIENTS_PER_ENTRY; i++) {
-        if (entry->patients[i].isActive &&
-            strcmp(entry->patients[i].patientName, patientName) == 0) {
-            
-            entry->patients[i].isActive = false;
-            entry->patientCount--;
-            return 0; // Success
-        }
+    if (patient != NULL && strcmp(patient->patientName, patientName) == 0) {
+        free(patient); // Free the dynamically allocated memory
+        hashTable[hash] = NULL;
+        return 0; // Success
     }
 
 	return -1; // Patient not present
@@ -140,67 +121,128 @@ int8_t IsPatientPresent(char patientName[MAX_PATIENTNAME_SIZE])
     }
 
     uint8_t hash = hashFunction(patientName);
-    HashEntry* entry = &hashTable[hash];
+    Patient* patient = hashTable[hash];
 
-    // Loop through the 100 slots in this hash entry
-    for (int i = 0; i < MAX_PATIENTS_PER_ENTRY; i++) {
-        if (entry->patients[i].isActive &&
-            strcmp(entry->patients[i].patientName, patientName) == 0) {
-            
-            return 0; // Patient is present
-        }
+    if (patient != NULL && strcmp(patient->patientName, patientName) == 0) {
+        return 0; // Patient is present
     }
 
 	return -1; // Patient not present
 }
 
+/**
+ * @brief Helper function to check if a date is within a given period.
+ */
+static bool isDateInRange(Date* date, Date* startDate, Date* endDate)
+{
+    // Convert dates to YYYYMMDD for simple integer comparison
+    uint32_t dateVal = date->year * 10000 + date->month * 100 + date->day;
+    uint32_t startVal = startDate->year * 10000 + startDate->month * 100 + startDate->day;
+    uint32_t endVal = endDate->year * 10000 + endDate->month * 100 + endDate->day;
 
-// --- Functions for later Sprints (Stubs) ---
+    return (dateVal >= startVal) && (dateVal <= endVal);
+}
 
 int8_t AddPatientDose(char patientName[MAX_PATIENTNAME_SIZE], 
 			          Date* date, uint16_t dose)
 {
-	 (void)patientName; // Prevent compiler warnings
-     (void)date;
-     (void)dose;
-	 return -1;
+	if (strlen(patientName) >= MAX_PATIENTNAME_SIZE) {
+        return -3; // Name too long
+    }
+
+    uint8_t hash = hashFunction(patientName);
+    Patient* patient = hashTable[hash];
+
+    if (patient == NULL || strcmp(patient->patientName, patientName) != 0) {
+        return -1; // Patient unknown
+    }
+
+    if (patient->doseCount >= MAX_DOSES_PER_PATIENT) {
+        return -2; // Dose array is full
+    }
+
+    // Add the dose
+    patient->doses[patient->doseCount].date = *date;
+    patient->doses[patient->doseCount].dose = dose;
+    patient->doseCount++;
+
+	return 0; // Success
 }
  
 int8_t PatientDoseInPeriod(char patientName[MAX_PATIENTNAME_SIZE], 
                            Date* startDate, Date* endDate, uint32_t* totalDose)
 {
-	 (void)patientName; // Prevent compiler warnings
-     (void)startDate;
-     (void)endDate;
-     (void)totalDose;
-	 return -1;
+    *totalDose = 0; // Initialize output parameter
+
+	if (strlen(patientName) >= MAX_PATIENTNAME_SIZE) {
+        return -2; // Name too long
+    }
+
+    uint8_t hash = hashFunction(patientName);
+    Patient* patient = hashTable[hash];
+
+    if (patient == NULL || strcmp(patient->patientName, patientName) != 0) {
+        return -1; // Patient unknown
+    }
+
+    // Iterate through the patient's doses
+    for (size_t i = 0; i < patient->doseCount; i++) {
+        if (isDateInRange(&patient->doses[i].date, startDate, endDate)) {
+            *totalDose += patient->doses[i].dose;
+        }
+    }
+	 
+	return 0; // Success
 }
 
 int8_t GetNumberOfMeasurements(char patientName[MAX_PATIENTNAME_SIZE], 
                                size_t * nrOfMeasurements)
 {
-	 (void)patientName; // Prevent compiler warnings
-     (void)nrOfMeasurements;
-	 return -1;
+	if (strlen(patientName) >= MAX_PATIENTNAME_SIZE) {
+        return -2; // Name too long
+    }
+
+    uint8_t hash = hashFunction(patientName);
+    Patient* patient = hashTable[hash];
+
+    if (patient == NULL || strcmp(patient->patientName, patientName) != 0) {
+        return -1; // Patient not present
+    }
+
+    *nrOfMeasurements = patient->doseCount;
+	return 0; // Success
 }
 
 void GetHashPerformance(size_t *totalNumberOfPatients, double *averageNumberOfPatients,
                         double *standardDeviation)
 {
-	 (void)totalNumberOfPatients; // Prevent compiler warnings
-     (void)averageNumberOfPatients;
-     (void)standardDeviation;
-	 return;
+    size_t totalPatients = 0;
+    double sumOfSquares = 0.0; // Sum of (entries_in_slot)^2
+
+    for (int i = 0; i < HASHTABLE_SIZE; i++) {
+        if (hashTable[i] != NULL) {
+            totalPatients++;
+            sumOfSquares += 1.0; // (1 patient)^2 is 1
+        }
+    }
+
+    *totalNumberOfPatients = totalPatients;
+    *averageNumberOfPatients = (double)totalPatients / HASHTABLE_SIZE;
+
+    // Calculate variance and standard deviation
+    double meanOfSquares = sumOfSquares / HASHTABLE_SIZE;
+    double variance = meanOfSquares - (*averageNumberOfPatients * *averageNumberOfPatients);
+    *standardDeviation = sqrt(variance);
 }
 				
 int8_t WriteToFile(char filePath[MAX_FILEPATH_LEGTH])
 {
-     (void)filePath; // Prevent compiler warnings
+     (void)filePath; // Not implemented in Sprint 2
 	 return -1;
 }
 
 int8_t ReadFromFile(char filePath[MAX_FILEPATH_LEGTH])
 {
-	 (void)filePath; // Prevent compiler warnings
+	 (void)filePath; // Not implemented in Sprint 2
 	 return -1;
 }
